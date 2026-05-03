@@ -2,13 +2,17 @@ FROM scratch AS ctx
 
 COPY ../shared/ /shared
 
-FROM  docker.io/library/ubuntu:questing AS base
+# Ubuntu 26.04 LTS "Resolute Raccoon"
+FROM docker.io/library/ubuntu:26.04 AS base
 
 FROM base AS builder
 
 RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,dst=/boot \
-    apt update -y && \
-    apt install -y git curl make build-essential go-md2man libzstd-dev pkgconf libostree-dev ostree
+    apt-get update -y && \
+    apt-get install -y \
+        git curl make build-essential go-md2man \
+        libzstd-dev pkgconf libostree-dev ostree && \
+    apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 ENV CARGO_HOME=/tmp/rust
 ENV RUSTUP_HOME=/tmp/rust
@@ -20,10 +24,37 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
 FROM base AS system
 COPY --from=builder /output /
 
-RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,dst=/boot apt update -y && \
-  apt install -y btrfs-progs dosfstools e2fsprogs fdisk linux-firmware linux-image-generic skopeo systemd systemd-boot* xfsprogs libostree-dev dracut && \
-  cp /boot/vmlinuz-* "$(find /usr/lib/modules -maxdepth 1 -type d | tail -n 1)/vmlinuz" && \
-  apt clean -y
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Stub out hooks that try to run update-initramfs / grub during apt installs.
+# We build the initramfs ourselves with dracut below.
+RUN printf '#!/bin/sh\nexit 0\n' > /usr/sbin/update-initramfs && \
+    chmod +x /usr/sbin/update-initramfs && \
+    printf '#!/bin/sh\nexit 0\n' > /usr/sbin/mkinitramfs && \
+    chmod +x /usr/sbin/mkinitramfs
+
+RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,dst=/boot \
+    apt-get update -y && \
+    apt-get install -y \
+        btrfs-progs \
+        dosfstools \
+        dracut \
+        e2fsprogs \
+        fdisk \
+        flatpak \
+        libostree-dev \
+        linux-firmware \
+        linux-image-generic \
+        podman \
+        skopeo \
+        systemd \
+        systemd-boot \
+        systemd-boot-efi \
+        xfsprogs && \
+    KVER=$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1 | xargs basename) && \
+    cp "/boot/vmlinuz-${KVER}" "/usr/lib/modules/${KVER}/vmlinuz" && \
+    rm -rf /boot/* && \
+    apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
@@ -34,5 +65,11 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     /ctx/shared/bootc-rootfs.sh
 
 LABEL containers.bootc 1
+
+# Clear /run and /tmp content left by package post-install scripts.
+# Podman bind-mounts /run/secrets and /run/.containerenv — skip those.
+RUN find /run -mindepth 1 -maxdepth 1 ! -name 'secrets' ! -name '.containerenv' \
+        -exec rm -rf {} + ; \
+    rm -rf /tmp/*
 
 RUN bootc container lint
