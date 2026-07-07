@@ -1,0 +1,47 @@
+name: Build Debian Stable
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+on:
+  push:
+    paths:
+      - 'debian-stable/**'
+      - Justfile
+      - bcvk.just
+  pull_request:
+    paths:
+      - 'debian-stable/**'
+      - Justfile
+      - bcvk.just
+    branches:
+      - main
+  schedule:
+    - cron: "0 1 * * *"
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-build.yaml
+    secrets: inherit
+    with:
+      image-name: debian-stable-bootc
+      image-desc: "Experimental debian-stable-bootc POC image"
+      image-keywords: "bootc,debian,stable"
+      image-logo: "https://avatars.githubusercontent.com/u/230667510?s=400&u=cb912a5db49aee164a609a0fb4967d2d8170feb9&v=4"
+      platforms: amd64,arm64
+      rechunk: ${{ github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+      publish: ${{ github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+
+  boot-test:
+    needs: build
+    uses: ./.github/workflows/reusable-boot-test.yaml
+    with:
+      image-name: debian-stable-bootc

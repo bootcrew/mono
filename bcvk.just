@@ -54,6 +54,7 @@ libvirt-check IMAGE:
 check-all:
     just bcvk check arch
     just bcvk check debian
+    just bcvk check debian-stable
     just bcvk check opensuse
     just bcvk check ubuntu
 
@@ -61,5 +62,6 @@ check-all:
 test-all:
     just bcvk ephemeral arch
     just bcvk ephemeral debian
+    just bcvk ephemeral debian-stable
     just bcvk ephemeral opensuse
     just bcvk ephemeral ubuntu
