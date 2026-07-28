@@ -2,13 +2,22 @@ FROM scratch AS ctx
 
 COPY ../shared/ /shared
 
-FROM docker.io/library/debian:unstable AS base
+FROM docker.io/library/debian:stable AS base
+
+# Add unstable repo pinned low so it is only used when explicitly
+# requested (-t unstable).  bootc and ostree need a newer libostree
+# than trixie ships (>= 2025.3, trixie has 2025.2).
+RUN printf 'deb http://deb.debian.org/debian unstable main\n' \
+        > /etc/apt/sources.list.d/unstable.list && \
+    printf 'Package: *\nPin: release a=unstable\nPin-Priority: 100\n' \
+        > /etc/apt/preferences.d/unstable.pref
 
 FROM base AS builder
 
 RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,dst=/boot \
     apt update -y && \
-    apt install -y git curl make build-essential go-md2man libzstd-dev pkgconf dracut libostree-dev ostree
+    apt install -y git curl make build-essential go-md2man libzstd-dev pkgconf dracut && \
+    apt install -y -t unstable libostree-dev ostree
 
 ENV CARGO_HOME=/tmp/rust
 ENV RUSTUP_HOME=/tmp/rust
@@ -21,8 +30,10 @@ FROM base AS system
 COPY --from=builder /output /
 
 RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/run --mount=type=tmpfs,dst=/root --mount=type=tmpfs,dst=/boot apt update -y && \
-  apt install -y btrfs-progs bubblewrap dosfstools dracut e2fsprogs fdisk firmware-linux-free linux-image-generic netplan.io libnss-resolve libnss-myhostname openssh-server skopeo systemd systemd-boot* systemd-resolved xfsprogs libostree-dev && \
+  apt install -y btrfs-progs bubblewrap dosfstools dracut e2fsprogs fdisk firmware-linux-free linux-image-$(dpkg --print-architecture) netplan.io libnss-resolve libnss-myhostname openssh-server skopeo systemd systemd-boot* systemd-resolved xfsprogs && \
+  apt install -y -t unstable libostree-dev ostree && \
   cp /boot/vmlinuz-* "$(find /usr/lib/modules -maxdepth 1 -type d | tail -n 1)/vmlinuz" && \
+  printf 'g _ssh -\n' >> /usr/lib/sysusers.d/openssh-server.conf && \
   apt clean -y
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
