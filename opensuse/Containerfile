@@ -41,7 +41,7 @@ RUN printf '[Match]\nType=ether\n\n[Network]\nDHCP=yes\n' \
     > /usr/lib/systemd/network/20-wired.network
 
 # Point resolv.conf at systemd-resolved's stub at first boot.
-RUN printf 'L! /etc/resolv.conf - - - - /run/systemd/resolve/stub-resolv.conf\n' \
+RUN printf 'L /etc/resolv.conf - - - - /run/systemd/resolve/stub-resolv.conf\n' \
     > /usr/lib/tmpfiles.d/resolv-conf.conf
 
 

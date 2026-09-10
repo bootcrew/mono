@@ -45,7 +45,7 @@ RUN printf '[Match]\nType=ether\n\n[Network]\nDHCP=yes\n' \
 # Point resolv.conf at systemd-resolved's stub via tmpfiles.d so it's
 # created correctly at first boot (can't symlink during build; resolv.conf
 # is bind-mounted by the container runtime and is EBUSY).
-RUN printf 'L! /etc/resolv.conf - - - - /run/systemd/resolve/stub-resolv.conf\n' \
+RUN printf 'L /etc/resolv.conf - - - - /run/systemd/resolve/stub-resolv.conf\n' \
     > /usr/lib/tmpfiles.d/resolv-conf.conf
 
 RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
