@@ -8,7 +8,7 @@ FROM base AS builder
 
 RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,dst=/boot \
     apt update -y && \
-    apt install -y git curl make build-essential go-md2man libzstd-dev pkgconf dracut libostree-dev ostree
+    apt install -y git curl make build-essential go-md2man libzstd-dev pkgconf dracut libostree-dev ostree libclang-dev
 
 ENV CARGO_HOME=/tmp/rust
 ENV RUSTUP_HOME=/tmp/rust
